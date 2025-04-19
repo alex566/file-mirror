@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package filemirror;
+
+option swift_prefix = "Filemirror";
+
+message FileAction {
+  enum ActionType {
+    CREATE = 0;
+    UPDATE = 1;
+    DELETE = 2;
+  }
+  
+  string id = 1;
+  ActionType action_type = 2;
+  string file_path = 3;
+  bytes content = 4;
+}
+
+// Message for progress/status updates
+message SyncStatus {
+  enum StatusType {
+    IN_PROGRESS = 0;
+    COMPLETED = 1;
+    FAILED = 2;
+  }
+  
+  string id = 1;
+  StatusType status = 2;
+  string message = 3;
+  int32 progress_percentage = 4;
+}

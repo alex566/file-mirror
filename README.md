@@ -125,4 +125,4 @@ FileMirror consists of several key components:
 
 ## License
 
-This project is available under the MIT license. See the LICENSE file for more info. 
+This project is available under the Apache License. See the LICENSE file for more info. 

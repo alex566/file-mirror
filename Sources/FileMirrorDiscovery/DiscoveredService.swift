@@ -86,52 +86,58 @@ public final class DiscoveredService: Sendable {
     }
     
     /// Connect to the discovered service
-    /// - Throws: Error if connection fails
-    public func connect() async throws {
-        let currentState = await stateContainer.getState()
-        guard currentState == .disconnected else {
-            return
-        }
-        
-        await stateContainer.setState(.connecting)
-        
-        // Configure connection parameters for TCP
-        let parameters = NWParameters.tcp
-        
-        // Use the endpoint provided during initialization
-        let newConnection = NWConnection(to: endpoint, using: parameters)
-        await stateContainer.setConnection(newConnection)
-        
-        return try await withCheckedThrowingContinuation { continuation in
-            // Start the connection
+    /// - Returns: An AsyncThrowingStream that emits connection state updates
+    /// - Throws: Error if connection fails to start
+    public func connect() -> AsyncThrowingStream<ConnectionState, Error> {
+        return AsyncThrowingStream { continuation in
             Task { [weak self] in
                 guard let self = self else {
-                    continuation.resume(throwing: NSError(domain: "DiscoveredService", 
-                                                          code: -1, 
-                                                          userInfo: [NSLocalizedDescriptionKey: "Connection setup failed"]))
+                    continuation.finish(throwing: NSError(domain: "DiscoveredService", 
+                                                         code: -1, 
+                                                         userInfo: [NSLocalizedDescriptionKey: "Service was deallocated"]))
                     return
                 }
                 
+                let currentState = await self.stateContainer.getState()
+                guard currentState == .disconnected else {
+                    // Already in a non-disconnected state, yield the current state and finish
+                    continuation.yield(currentState)
+                    continuation.finish()
+                    return
+                }
+                
+                await self.stateContainer.setState(.connecting)
+                continuation.yield(.connecting)
+                
+                // Configure connection parameters for TCP
+                let parameters = NWParameters.tcp
+                
+                // Use the endpoint provided during initialization
+                let newConnection = NWConnection(to: self.endpoint, using: parameters)
+                await self.stateContainer.setConnection(newConnection)
+                
                 newConnection.stateUpdateHandler = { state in
                     Task { [weak self] in
-                        guard let self = self else { return }
+                        guard let self = self else { 
+                            continuation.finish()
+                            return 
+                        }
                         
                         switch state {
                         case .ready:
                             await self.stateContainer.setState(.connected)
-                            continuation.resume()
+                            continuation.yield(.connected)
                             
                         case .failed(let error):
-                            await self.stateContainer.setState(.failed(error.localizedDescription))
-                            continuation.resume(throwing: error)
+                            let failedState = ConnectionState.failed(error.localizedDescription)
+                            await self.stateContainer.setState(failedState)
+                            continuation.yield(failedState)
+                            continuation.finish(throwing: error)
                             
                         case .cancelled:
                             await self.stateContainer.setState(.disconnected)
-                            continuation.resume(
-                                throwing: NSError(domain: "DiscoveredService",
-                                                  code: -1,
-                                                  userInfo: [NSLocalizedDescriptionKey: "Connection cancelled"])
-                            )
+                            continuation.yield(.disconnected)
+                            continuation.finish()
                             
                         default:
                             break
@@ -140,6 +146,13 @@ public final class DiscoveredService: Sendable {
                 }
                 
                 newConnection.start(queue: .main)
+                
+                // Set up the continuation's termination handler
+                continuation.onTermination = { [weak self] _ in
+                    Task { [weak self] in
+                        await self?.disconnect()
+                    }
+                }
             }
         }
     }

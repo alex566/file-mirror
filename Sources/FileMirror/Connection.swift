@@ -60,13 +60,13 @@ public final class Connection: Sendable {
     }
 
     /// Mirror multiple files, collecting changes into batches
-    public func mirrorFiles(urls: [URL]) async {
+    public func mirrorFiles(folder: URL, urls: [URL]) async {
         let actionChannel = AsyncChannel<FileMirrorFileAction>()
         await withTaskGroup { group in
             // Start a file session for each URL
             for url in urls {
                 let id = UUID().uuidString
-                let session = FileSession(id: id, url: url)
+                let session = FileSession(id: id, folder: folder, url: url)
                 
                 // Add a task to monitor file changes
                 group.addTask {
@@ -78,10 +78,10 @@ public final class Connection: Sendable {
             
             // Add a task to process debounced actions
             group.addTask {
-                for await action in actionChannel.debounce(for: .seconds(0.1)) {
+                for await actions in actionChannel.chunked(by: .repeating(every: .milliseconds(100))) {
                     let batch = FileSyncManager.batchMessage(
                         sessionId: self.id,
-                        actions: [action]
+                        actions: actions
                     )
                     
                     do {

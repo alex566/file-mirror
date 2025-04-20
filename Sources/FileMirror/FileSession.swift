@@ -4,10 +4,12 @@ import FileMirrorProtocol
 /// A session that monitors a file and emits changes as an async stream of actions
 final class FileSession: Sendable {
     let id: String
+    let folder: URL
     let url: URL
 
-    init(id: String, url: URL) {
+    init(id: String, folder: URL, url: URL) {
         self.id = id
+        self.folder = folder
         self.url = url
     }
     
@@ -15,7 +17,17 @@ final class FileSession: Sendable {
     func start() -> AsyncStream<FileMirrorFileAction> {
         AsyncStream { continuation in
             Task {
-                let path = url.path(percentEncoded: false)
+                // Get the relative path by using FileManager's relativePath method
+                let absolutePath = url.path(percentEncoded: false)
+                let folderPath = folder.path(percentEncoded: false)
+
+                let path: String
+                if absolutePath.hasPrefix(folderPath) {
+                    path = absolutePath.replacingOccurrences(of: folderPath, with: "")
+                } else {
+                    print("WARNING: File \(url.lastPathComponent) is not in the folder \(folder.lastPathComponent)")
+                    path = absolutePath
+                }
                 
                 // Create initial file action for the file
                 do {

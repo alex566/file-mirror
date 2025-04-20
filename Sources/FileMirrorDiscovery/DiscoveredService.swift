@@ -324,7 +324,7 @@ public final class DiscoveredService: Sendable {
             try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true, attributes: nil)
             
             // Write the file content
-            try action.content.write(to: fileURL)
+            try action.content.write(to: fileURL, options: .atomic)
             
         case .delete:
             if fileManager.fileExists(atPath: fileURL.path) {

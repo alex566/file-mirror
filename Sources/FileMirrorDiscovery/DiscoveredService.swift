@@ -272,7 +272,7 @@ public final class DiscoveredService: Sendable {
         let fileManager = FileManager.default
         
         // Construct the full file path relative to the destination URL
-        let relativePath = action.filePath.starts(with: "/") ? String(action.filePath.dropFirst()) : action.filePath
+        let relativePath = action.filePath
         let fileURL = destinationURL.appendingPathComponent(relativePath)
         
         switch action.actionType {

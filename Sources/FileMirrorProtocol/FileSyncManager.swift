@@ -7,7 +7,6 @@
 
 import Foundation
 import SwiftProtobuf
-import librsync
 
 /// Manages file synchronization operations
 public enum FileSyncManager {

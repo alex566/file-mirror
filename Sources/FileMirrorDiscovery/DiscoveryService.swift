@@ -119,11 +119,16 @@ private func processResults(_ results: Set<NWBrowser.Result>) -> [DiscoveredServ
             case .bonjour(let txt):
                 let txtData = txt.dictionary
                 
-                let svc = DiscoveredService(
-                    name: name,
-                    endpoint: result.endpoint
-                )
-                services.append(svc)
+                if let id = txtData["id"] {
+                    let svc = DiscoveredService(
+                        id: id,
+                        name: name,
+                        endpoint: result.endpoint
+                    )
+                    services.append(svc)
+                } else {
+                    print("Service is missing required data")
+                }
             @unknown default:
                 break
             }

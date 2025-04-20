@@ -26,6 +26,8 @@ public enum ConnectionState: Sendable, Equatable {
 /// Represents a discovered service for mirroring
 public final class DiscoveredService: Sendable {
     
+    public let id: String
+    
     /// Service name as discovered by Bonjour
     public let name: String
     
@@ -61,7 +63,8 @@ public final class DiscoveredService: Sendable {
     /// - Parameters:
     ///   - name: The name of the service from Bonjour
     ///   - endpoint: The network endpoint to connect to
-    init(name: String, endpoint: NWEndpoint) {
+    init(id: String, name: String, endpoint: NWEndpoint) {
+        self.id = id
         self.name = name
         self.endpoint = endpoint
     }

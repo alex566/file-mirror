@@ -47,8 +47,10 @@ public actor AdvertisingService {
         // Parameters: TCP transport + peer-to-peer
         let parameters = NWParameters.tcp
         parameters.includePeerToPeer = true
+        
+        let id = UUID().uuidString
 
-        let record = NWTXTRecord(["appName": "FileMirror"])
+        let record = NWTXTRecord(["id": id])
         
         let service = NWListener.Service(
             name: name,
@@ -86,7 +88,6 @@ public actor AdvertisingService {
             }
 
             listener?.newConnectionHandler = { nwConnection in
-                let id = UUID().uuidString
                 let connection = Connection(id: id, nwConnection: nwConnection)
                 
                 // Start the connection

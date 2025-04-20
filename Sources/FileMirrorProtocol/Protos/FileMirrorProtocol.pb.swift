@@ -34,6 +34,15 @@ public struct FileMirrorFileAction: @unchecked Sendable {
 
   public var content: Data = Data()
 
+  public var shared: Data {
+    get {return _shared ?? Data()}
+    set {_shared = newValue}
+  }
+  /// Returns true if `shared` has been explicitly set.
+  public var hasShared: Bool {return self._shared != nil}
+  /// Clears the value of `shared`. Subsequent reads from it will return its default value.
+  public mutating func clearShared() {self._shared = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public enum ActionType: SwiftProtobuf.Enum, Swift.CaseIterable {
@@ -75,6 +84,8 @@ public struct FileMirrorFileAction: @unchecked Sendable {
   }
 
   public init() {}
+
+  fileprivate var _shared: Data? = nil
 }
 
 public struct FileMirrorSyncBatch: Sendable {
@@ -102,6 +113,7 @@ extension FileMirrorFileAction: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     2: .standard(proto: "action_type"),
     3: .standard(proto: "file_path"),
     4: .same(proto: "content"),
+    5: .same(proto: "shared"),
   ]
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -114,12 +126,17 @@ extension FileMirrorFileAction: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
       case 2: try { try decoder.decodeSingularEnumField(value: &self.actionType) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.filePath) }()
       case 4: try { try decoder.decodeSingularBytesField(value: &self.content) }()
+      case 5: try { try decoder.decodeSingularBytesField(value: &self._shared) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.id.isEmpty {
       try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
     }
@@ -132,6 +149,9 @@ extension FileMirrorFileAction: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     if !self.content.isEmpty {
       try visitor.visitSingularBytesField(value: self.content, fieldNumber: 4)
     }
+    try { if let v = self._shared {
+      try visitor.visitSingularBytesField(value: v, fieldNumber: 5)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -140,6 +160,7 @@ extension FileMirrorFileAction: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     if lhs.actionType != rhs.actionType {return false}
     if lhs.filePath != rhs.filePath {return false}
     if lhs.content != rhs.content {return false}
+    if lhs._shared != rhs._shared {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

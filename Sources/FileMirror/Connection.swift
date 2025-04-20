@@ -10,6 +10,11 @@ import Foundation
 import AsyncAlgorithms
 import FileMirrorProtocol
 
+public struct MirrorFile {
+    let url: URL
+    let isShared: Bool
+}
+
 /// Represents a connection to a peer for file mirroring
 public final class Connection: Sendable {
     
@@ -60,13 +65,13 @@ public final class Connection: Sendable {
     }
 
     /// Mirror multiple files, collecting changes into batches
-    public func mirrorFiles(folder: URL, urls: [URL]) async {
+    public func mirrorFiles(folder: URL, files: [MirrorFile]) async {
         let actionChannel = AsyncChannel<FileMirrorFileAction>()
         await withTaskGroup { group in
             // Start a file session for each URL
-            for url in urls {
+            for file in files {
                 let id = UUID().uuidString
-                let session = FileSession(id: id, folder: folder, url: url)
+                let session = FileSession(id: id, folder: folder, url: file.url, isShared: file.isShared)
                 
                 // Add a task to monitor file changes
                 group.addTask {

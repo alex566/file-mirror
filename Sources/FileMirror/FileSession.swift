@@ -6,11 +6,13 @@ final class FileSession: Sendable {
     let id: String
     let folder: URL
     let url: URL
+    let isShared: Bool
 
-    init(id: String, folder: URL, url: URL) {
+    init(id: String, folder: URL, url: URL, isShared: Bool) {
         self.id = id
         self.folder = folder
         self.url = url
+        self.isShared = isShared
     }
     
     /// Start monitoring the file and return a stream of file actions
@@ -38,6 +40,12 @@ final class FileSession: Sendable {
                 // Watch for changes
                 let watcher = FileWatcher()
                 let stream = watcher.observe(url: url, event: .write)
+
+                let sharedMmap: MemoryMappedFile? = if isShared {
+                    try MemoryMappedFile(path: url.path, readOnly: false)
+                } else {
+                    nil
+                }
                 
                 do {
                     for try await _ in stream {
@@ -46,7 +54,8 @@ final class FileSession: Sendable {
                             let action = FileSyncManager.updateFileActionMessage(
                                 id: id, 
                                 filePath: relativePath, 
-                                content: updatedData
+                                content: updatedData,
+                                shared: sharedMmap?.readAll()
                             )
                             continuation.yield(action)
                         } catch {

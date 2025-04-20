@@ -32,13 +32,17 @@ public enum FileSyncManager {
     public static func updateFileActionMessage(
         id: String,
         filePath: String,
-        content: Data
+        content: Data,
+        shared: Data?
     ) -> FileMirrorFileAction {
         var message = FileMirrorFileAction()
         message.id = id
         message.actionType = .update
         message.filePath = filePath
         message.content = content
+        if let shared {
+            message.shared = shared
+        }
         return message
     }
 

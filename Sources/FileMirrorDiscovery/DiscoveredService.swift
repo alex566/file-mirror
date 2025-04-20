@@ -313,8 +313,16 @@ public final class DiscoveredService: Sendable {
             
             // Write the file content
             try action.content.write(to: fileURL, options: .atomic)
-            continuation.yield(.created(fileURL: fileURL))
 
+            if action.hasShared {
+                let sharedData = action.shared
+
+                let sharedFileURL = try MemoryMappedFile(path: fileURL.path(percentEncoded: false), readOnly: false)
+                try sharedFileURL.write(data: sharedData, offset: 0)
+                sharedFileURL.sync()
+            }
+
+            continuation.yield(.created(fileURL: fileURL))
         case .update:
             let handle = try FileHandle(forUpdating: fileURL)
             try handle.truncate(atOffset: 0)
@@ -322,7 +330,13 @@ public final class DiscoveredService: Sendable {
             try handle.synchronize()
             handle.closeFile()
 
-            try (fileURL as NSURL).setResourceValue(Date(), forKey: URLResourceKey.contentModificationDateKey)
+            if action.hasShared {
+                let sharedData = action.shared
+
+                let sharedFileURL = try MemoryMappedFile(path: fileURL.path(percentEncoded: false), readOnly: false)
+                try sharedFileURL.write(data: sharedData, offset: 0)
+                sharedFileURL.sync()
+            }
 
             continuation.yield(.updated(fileURL: fileURL))
             

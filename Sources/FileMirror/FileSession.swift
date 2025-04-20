@@ -17,24 +17,15 @@ final class FileSession: Sendable {
     func start() -> AsyncStream<FileMirrorFileAction> {
         AsyncStream { continuation in
             Task {
-                // Get the relative path by using FileManager's relativePath method
-                let absolutePath = url.path(percentEncoded: false)
-                let folderPath = folder.path(percentEncoded: false)
-
-                let path: String
-                if absolutePath.hasPrefix(folderPath) {
-                    path = absolutePath.replacingOccurrences(of: folderPath, with: "")
-                } else {
-                    print("WARNING: File \(absolutePath) is not in the folder \(folderPath)")
-                    path = absolutePath
-                }
+                // Calculate the relative path using a more robust method
+                let relativePath = url.relativePath(from: folder)
                 
                 // Create initial file action for the file
                 do {
                     let fileData = try Data(contentsOf: url)
                     let action = FileSyncManager.createFileActionMessage(
                         id: id, 
-                        filePath: path, 
+                        filePath: relativePath, 
                         content: fileData
                     )
                     continuation.yield(action)
@@ -52,7 +43,7 @@ final class FileSession: Sendable {
                             let updatedData = try Data(contentsOf: url)
                             let action = FileSyncManager.updateFileActionMessage(
                                 id: id, 
-                                filePath: path, 
+                                filePath: relativePath, 
                                 content: updatedData
                             )
                             continuation.yield(action)
@@ -71,5 +62,31 @@ final class FileSession: Sendable {
                 print("FileSession for \(self.url.lastPathComponent) terminated")
             }
         }
+    }
+}
+
+// MARK: - URL Path Extensions
+
+extension URL {
+    /// Calculate the relative path from a base URL to this URL
+    func relativePath(from base: URL) -> String {
+        // Ensure both URLs use the same standardization and resolve symlinks
+        let destComponents = self.standardized.resolvingSymlinksInPath().pathComponents
+        let baseComponents = base.standardized.resolvingSymlinksInPath().pathComponents
+
+        // Find number of common path components
+        var i = 0
+        while i < destComponents.count && i < baseComponents.count
+            && destComponents[i] == baseComponents[i] {
+                i += 1
+        }
+
+        // Build relative path
+        var relComponents = Array(repeating: "..", count: baseComponents.count - i)
+        relComponents.append(contentsOf: destComponents[i...])
+        let relativePath = relComponents.joined(separator: "/")
+        
+        // If the path is empty, return "." to indicate current directory
+        return relativePath.isEmpty ? "." : relativePath
     }
 }

@@ -28,8 +28,8 @@ let package = Package(
         .target(
             name: "FileMirrorProtocol",
             dependencies: [
-                .product(name: "SwiftProtobuf", package: "swift-protobuf"),
-                "librsync"
+                .product(name: "SwiftProtobuf", package: "swift-protobuf")
+                // "librsync"
             ],
             exclude: [
                 "Protos/FileMirrorProtocol.proto"

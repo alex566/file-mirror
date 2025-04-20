@@ -127,6 +127,8 @@ public final class DiscoveredService: Sendable {
                             return 
                         }
                         
+                        print("Connection state: \(state)")
+                        
                         switch state {
                         case .ready:
                             await self.stateContainer.setState(.connected)

@@ -210,6 +210,8 @@ public final class DiscoveredService: Sendable {
     private func receiveData(connection: NWConnection, destinationURL: URL, continuation: AsyncThrowingStream<ConnectionState, Error>.Continuation) {
         // Set up to receive the message
         connection.receiveMessage { [weak self] (data, context, isComplete, error) in
+            print("Received message")
+            
             guard let self = self else {
                 continuation.finish()
                 return
@@ -262,6 +264,7 @@ public final class DiscoveredService: Sendable {
             
             // Process each action
             for action in batch.actions {
+                print("Process action: \(action)")
                 try await applyFileAction(action, destinationURL: destinationURL)
             }
         } catch {

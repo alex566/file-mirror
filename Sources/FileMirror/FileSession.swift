@@ -25,7 +25,7 @@ final class FileSession: Sendable {
                 if absolutePath.hasPrefix(folderPath) {
                     path = absolutePath.replacingOccurrences(of: folderPath, with: "")
                 } else {
-                    print("WARNING: File \(url.lastPathComponent) is not in the folder \(folder)")
+                    print("WARNING: File \(absolutePath) is not in the folder \(folderPath)")
                     path = absolutePath
                 }
                 

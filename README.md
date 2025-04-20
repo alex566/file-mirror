@@ -25,7 +25,7 @@ Add the following to your `Package.swift` file:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/yourusername/FileMirror.git", from: "1.0.0")
+    .package(url: "https://github.com/alex566/FileMirror.git", from: "1.0.0")
 ]
 ```
 

@@ -28,10 +28,10 @@ let package = Package(
             name: "FileMirrorProtocol",
             dependencies: [
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
+                "librsync"
             ],
             exclude: [
-                "FileMirrorProtocol.proto",
-                "swift-protobuf-config.json"
+                "Protos/FileMirrorProtocol.proto"
             ]),
         .target(
             name: "FileMirror",
@@ -39,6 +39,10 @@ let package = Package(
         .target(
             name: "FileMirrorDiscovery",
             dependencies: ["FileMirrorProtocol"]),
+        .binaryTarget(
+            name: "librsync",
+            path: "Frameworks/librsync.xcframework"
+        ),
         .testTarget(
             name: "FileMirrorTests",
             dependencies: ["FileMirror"]

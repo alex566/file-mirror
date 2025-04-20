@@ -1,5 +1,0 @@
-module librsync {
-    umbrella header "librsync.h"
-    export *
-    module * { export * }
-} 

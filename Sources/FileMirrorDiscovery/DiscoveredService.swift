@@ -216,8 +216,6 @@ public final class DiscoveredService: Sendable {
     
     /// Receive and buffer data from the connection until a complete message is received
     private func receiveDataBuffer(connection: NWConnection, buffer: Data, destinationURL: URL, continuation: AsyncThrowingStream<ConnectionState, Error>.Continuation) {
-        print("Receiving data chunks")
-        
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] (data, context, isComplete, error) in
             guard let self = self else {
                 continuation.finish()
@@ -238,7 +236,6 @@ public final class DiscoveredService: Sendable {
             if let data = data, !data.isEmpty {
                 var updatedBuffer = buffer
                 updatedBuffer.append(data)
-                print("Received data chunk: \(data.count) bytes, buffer now: \(updatedBuffer.count) bytes")
                 
                 // Try to process the buffer as a complete message
                 Task {
@@ -251,7 +248,6 @@ public final class DiscoveredService: Sendable {
                             self.receiveDataBuffer(connection: connection, buffer: Data(), destinationURL: destinationURL, continuation: continuation)
                         } else {
                             // Message is incomplete, continue receiving more data
-                            print("Message incomplete, continuing to receive")
                             self.receiveDataBuffer(connection: connection, buffer: updatedBuffer, destinationURL: destinationURL, continuation: continuation)
                         }
                     } catch {

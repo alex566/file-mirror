@@ -17,9 +17,19 @@ public enum ConnectionState: Sendable, Equatable {
     case connecting
     /// Connected to the service
     case connected
-    /// Currently mirroring files
-    case mirroring(URL)
     /// Connection failed with error
+    case failed(String)
+}
+
+/// Events emitted during file mirroring
+public enum MirroringEvent: Sendable, Equatable {
+    /// A file was created
+    case created(fileURL: URL)
+    /// A file was updated
+    case updated(fileURL: URL)
+    /// A file was deleted
+    case deleted(fileURL: URL)
+    /// Mirroring failed with error
     case failed(String)
 }
 
@@ -169,19 +179,13 @@ public final class DiscoveredService: Sendable {
             connection.cancel()
         }
         await stateContainer.setConnection(nil)
-        
-        let currentState = await stateContainer.getState()
-        if case .mirroring = currentState {
-            // Stop mirroring logic if needed
-        }
-        
         await stateContainer.setState(.disconnected)
     }
     
     /// Start receiving mirrored files
     /// - Parameter destinationURL: The base URL where mirrored files will be saved
     /// - Returns: An async stream of mirroring events
-    public func startMirroring(destinationURL: URL) -> AsyncThrowingStream<ConnectionState, Error> {
+    public func startMirroring(destinationURL: URL) -> AsyncThrowingStream<MirroringEvent, Error> {
         AsyncThrowingStream { continuation in
             Task { [weak self] in
                 guard let self = self else {
@@ -199,9 +203,6 @@ public final class DiscoveredService: Sendable {
                     return
                 }
                 
-                await self.stateContainer.setState(.mirroring(destinationURL))
-                continuation.yield(.mirroring(destinationURL))
-                
                 // Start receiving data
                 self.receiveData(connection: connection, destinationURL: destinationURL, continuation: continuation)
             }
@@ -209,13 +210,13 @@ public final class DiscoveredService: Sendable {
     }
     
     /// Receive and process data from the connection
-    private func receiveData(connection: NWConnection, destinationURL: URL, continuation: AsyncThrowingStream<ConnectionState, Error>.Continuation) {
+    private func receiveData(connection: NWConnection, destinationURL: URL, continuation: AsyncThrowingStream<MirroringEvent, Error>.Continuation) {
         // Create a data buffer to accumulate incoming data chunks
         self.receiveDataBuffer(connection: connection, buffer: Data(), destinationURL: destinationURL, continuation: continuation)
     }
     
     /// Receive and buffer data from the connection until a complete message is received
-    private func receiveDataBuffer(connection: NWConnection, buffer: Data, destinationURL: URL, continuation: AsyncThrowingStream<ConnectionState, Error>.Continuation) {
+    private func receiveDataBuffer(connection: NWConnection, buffer: Data, destinationURL: URL, continuation: AsyncThrowingStream<MirroringEvent, Error>.Continuation) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] (data, context, isComplete, error) in
             guard let self = self else {
                 continuation.finish()
@@ -223,12 +224,9 @@ public final class DiscoveredService: Sendable {
             }
             
             if let error = error {
-                let failedState = ConnectionState.failed(error.localizedDescription)
-                Task {
-                    await self.stateContainer.setState(failedState)
-                    continuation.yield(failedState)
-                    continuation.finish(throwing: error)
-                }
+                let failedEvent = MirroringEvent.failed(error.localizedDescription)
+                continuation.yield(failedEvent)
+                continuation.finish(throwing: error)
                 return
             }
             
@@ -242,7 +240,7 @@ public final class DiscoveredService: Sendable {
                     do {
                         if self.isCompleteMessage(updatedBuffer) {
                             print("Complete message received")
-                            try await self.processSyncData(data: updatedBuffer, destinationURL: destinationURL)
+                            try await self.processSyncData(data: updatedBuffer, destinationURL: destinationURL, continuation: continuation)
                             
                             // Start receiving the next message with a fresh buffer
                             self.receiveDataBuffer(connection: connection, buffer: Data(), destinationURL: destinationURL, continuation: continuation)
@@ -251,19 +249,14 @@ public final class DiscoveredService: Sendable {
                             self.receiveDataBuffer(connection: connection, buffer: updatedBuffer, destinationURL: destinationURL, continuation: continuation)
                         }
                     } catch {
-                        let failedState = ConnectionState.failed(error.localizedDescription)
-                        await self.stateContainer.setState(failedState)
-                        continuation.yield(failedState)
+                        let failedEvent = MirroringEvent.failed(error.localizedDescription)
+                        continuation.yield(failedEvent)
                         continuation.finish(throwing: error)
                     }
                 }
             } else if isComplete {
                 // Connection was closed by the remote peer
-                Task {
-                    await self.stateContainer.setState(.disconnected)
-                    continuation.yield(.disconnected)
-                    continuation.finish()
-                }
+                continuation.finish()
             } else {
                 // No data received but not complete, continue receiving
                 self.receiveDataBuffer(connection: connection, buffer: buffer, destinationURL: destinationURL, continuation: continuation)
@@ -289,15 +282,15 @@ public final class DiscoveredService: Sendable {
     }
     
     /// Process data received from the connection
-    private func processSyncData(data: Data, destinationURL: URL) async throws {
+    private func processSyncData(data: Data, destinationURL: URL, continuation: AsyncThrowingStream<MirroringEvent, Error>.Continuation) async throws {
         do {
             // Parse the batch message
             let batch = try FileMirrorSyncBatch(serializedBytes: data)
             
-            // Process each action
+            // Process each action and emit appropriate events
             for action in batch.actions {
                 print("Process action: \(action.actionType)")
-                try await applyFileAction(action, destinationURL: destinationURL)
+                try await applyFileAction(action, destinationURL: destinationURL, continuation: continuation)
             }
         } catch {
             print("Error processing sync data: \(error)")
@@ -306,7 +299,7 @@ public final class DiscoveredService: Sendable {
     }
     
     /// Apply a file action to the local file system
-    private func applyFileAction(_ action: FileMirrorFileAction, destinationURL: URL) async throws {
+    private func applyFileAction(_ action: FileMirrorFileAction, destinationURL: URL, continuation: AsyncThrowingStream<MirroringEvent, Error>.Continuation) async throws {
         let fileManager = FileManager.default
         
         // Construct the full file path relative to the destination URL
@@ -321,18 +314,20 @@ public final class DiscoveredService: Sendable {
             
             // Write the file content
             try action.content.write(to: fileURL, options: .atomic)
+            continuation.yield(.created(fileURL: fileURL))
 
         case .update:
-
             let handle = try FileHandle(forUpdating: fileURL)
             try handle.truncate(atOffset: 0)
             try handle.write(contentsOf: action.content)
             try handle.synchronize()
             handle.closeFile()
+            continuation.yield(.updated(fileURL: fileURL))
             
         case .delete:
             if fileManager.fileExists(atPath: fileURL.path) {
                 try fileManager.removeItem(at: fileURL)
+                continuation.yield(.deleted(fileURL: fileURL))
             }
         case .UNRECOGNIZED(let value):
             throw NSError(domain: "DiscoveredService", 

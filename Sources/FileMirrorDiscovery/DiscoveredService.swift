@@ -179,7 +179,7 @@ public final class DiscoveredService: Sendable {
     /// Start receiving mirrored files
     /// - Parameter destinationURL: The base URL where mirrored files will be saved
     /// - Returns: An async stream of mirroring events
-    public func startMirroring(destinationURL: URL) async throws -> AsyncThrowingStream<ConnectionState, Error> {
+    public func startMirroring(destinationURL: URL) -> AsyncThrowingStream<ConnectionState, Error> {
         AsyncThrowingStream { continuation in
             Task { [weak self] in
                 guard let self = self else {

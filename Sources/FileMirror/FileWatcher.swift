@@ -1,6 +1,6 @@
 import Foundation
 
-enum FileWatcher {
+struct FileWatcher {
     
     enum Event {
         case write

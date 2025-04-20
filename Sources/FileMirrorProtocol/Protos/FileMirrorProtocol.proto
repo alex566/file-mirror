@@ -2,7 +2,9 @@ syntax = "proto3";
 
 package filemirror;
 
-option swift_prefix = "Filemirror";
+option swift_prefix = "FileMirror";
+
+
 
 message FileAction {
   enum ActionType {
@@ -17,16 +19,7 @@ message FileAction {
   bytes content = 4;
 }
 
-// Message for progress/status updates
-message SyncStatus {
-  enum StatusType {
-    IN_PROGRESS = 0;
-    COMPLETED = 1;
-    FAILED = 2;
-  }
-  
-  string id = 1;
-  StatusType status = 2;
-  string message = 3;
-  int32 progress_percentage = 4;
+message SyncBatch {
+  string session_id = 1;
+  repeated FileAction actions = 2;
 }

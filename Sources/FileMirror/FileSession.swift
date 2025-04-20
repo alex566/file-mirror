@@ -11,6 +11,16 @@ final class FileSession: Sendable {
     
     func start() async {
         // Send initial file data
-        // Start watching for changes
+
+        let watcher = FileWatcher()
+        let stream = watcher.observe(url: url, event: .write)
+
+        do {
+            for try await _ in stream {
+                // Calculate diff and send it to the connection
+            }
+        } catch {
+            print("Error watching file: \(error)")
+        }
     }
 }

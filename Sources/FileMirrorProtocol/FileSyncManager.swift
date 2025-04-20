@@ -10,7 +10,7 @@ import SwiftProtobuf
 import librsync
 
 /// Manages file synchronization operations
-public class FileSyncManager {
+public enum FileSyncManager {
     
     /// Create a file action message for a file creation or update
     /// - Parameters:
@@ -19,11 +19,11 @@ public class FileSyncManager {
     /// - Returns: A FileAction message
     public static func createFileActionMessage(
         id: String = UUID().uuidString,
-        action: FilemirrorFileAction.ActionType,
+        action: FileMirrorFileAction.ActionType,
         filePath: String,
         content: Data? = nil
-    ) -> FilemirrorFileAction {
-        var message = FilemirrorFileAction()
+    ) -> FileMirrorFileAction {
+        var message = FileMirrorFileAction()
         message.id = id
         message.actionType = action
         message.filePath = filePath
@@ -36,7 +36,7 @@ public class FileSyncManager {
     /// Apply a file action to the file system
     /// - Parameter action: The FileAction to apply
     /// - Throws: FileError if the operation fails
-    public static func applyFileAction(_ action: FilemirrorFileAction) throws {
+    public static func applyFileAction(_ action: FileMirrorFileAction) throws {
         let fileManager = FileManager.default
         let filePath = action.filePath
         
@@ -55,25 +55,6 @@ public class FileSyncManager {
             }
         case .UNRECOGNIZED(let value):
             throw FileError.invalidAction("Unrecognized action type: \(value)")
-        }
-    }
-    
-    /// Check if a file has changed compared to its content in memory
-    /// - Parameters:
-    ///   - filePath: Path to the file
-    ///   - oldContent: Previous content of the file
-    /// - Returns: Whether the file has changed and the new content if it has
-    public static func hasFileChanged(filePath: String, oldContent: Data?) -> (changed: Bool, newContent: Data?) {
-        guard let content = try? Data(contentsOf: URL(fileURLWithPath: filePath)) else {
-            // File doesn't exist or can't be read
-            return (oldContent != nil, nil)
-        }
-        
-        if let oldContent = oldContent {
-            return (content != oldContent, content)
-        } else {
-            // No old content, so the file is considered changed
-            return (true, content)
         }
     }
 }

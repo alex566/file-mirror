@@ -21,14 +21,14 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
   typealias Version = _2
 }
 
-public struct FilemirrorFileAction: @unchecked Sendable {
+public struct FileMirrorFileAction: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   public var id: String = String()
 
-  public var actionType: FilemirrorFileAction.ActionType = .create
+  public var actionType: FileMirrorFileAction.ActionType = .create
 
   public var filePath: String = String()
 
@@ -66,7 +66,7 @@ public struct FilemirrorFileAction: @unchecked Sendable {
     }
 
     // The compiler won't synthesize support with the UNRECOGNIZED case.
-    public static let allCases: [FilemirrorFileAction.ActionType] = [
+    public static let allCases: [FileMirrorFileAction.ActionType] = [
       .create,
       .update,
       .delete,
@@ -77,59 +77,16 @@ public struct FilemirrorFileAction: @unchecked Sendable {
   public init() {}
 }
 
-/// Message for progress/status updates
-public struct FilemirrorSyncStatus: Sendable {
+public struct FileMirrorSyncBatch: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var id: String = String()
+  public var sessionID: String = String()
 
-  public var status: FilemirrorSyncStatus.StatusType = .inProgress
-
-  public var message: String = String()
-
-  public var progressPercentage: Int32 = 0
+  public var actions: [FileMirrorFileAction] = []
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public enum StatusType: SwiftProtobuf.Enum, Swift.CaseIterable {
-    public typealias RawValue = Int
-    case inProgress // = 0
-    case completed // = 1
-    case failed // = 2
-    case UNRECOGNIZED(Int)
-
-    public init() {
-      self = .inProgress
-    }
-
-    public init?(rawValue: Int) {
-      switch rawValue {
-      case 0: self = .inProgress
-      case 1: self = .completed
-      case 2: self = .failed
-      default: self = .UNRECOGNIZED(rawValue)
-      }
-    }
-
-    public var rawValue: Int {
-      switch self {
-      case .inProgress: return 0
-      case .completed: return 1
-      case .failed: return 2
-      case .UNRECOGNIZED(let i): return i
-      }
-    }
-
-    // The compiler won't synthesize support with the UNRECOGNIZED case.
-    public static let allCases: [FilemirrorSyncStatus.StatusType] = [
-      .inProgress,
-      .completed,
-      .failed,
-    ]
-
-  }
 
   public init() {}
 }
@@ -138,7 +95,7 @@ public struct FilemirrorSyncStatus: Sendable {
 
 fileprivate let _protobuf_package = "filemirror"
 
-extension FilemirrorFileAction: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+extension FileMirrorFileAction: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".FileAction"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "id"),
@@ -178,7 +135,7 @@ extension FilemirrorFileAction: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: FilemirrorFileAction, rhs: FilemirrorFileAction) -> Bool {
+  public static func ==(lhs: FileMirrorFileAction, rhs: FileMirrorFileAction) -> Bool {
     if lhs.id != rhs.id {return false}
     if lhs.actionType != rhs.actionType {return false}
     if lhs.filePath != rhs.filePath {return false}
@@ -188,7 +145,7 @@ extension FilemirrorFileAction: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
-extension FilemirrorFileAction.ActionType: SwiftProtobuf._ProtoNameProviding {
+extension FileMirrorFileAction.ActionType: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     0: .same(proto: "CREATE"),
     1: .same(proto: "UPDATE"),
@@ -196,13 +153,11 @@ extension FilemirrorFileAction.ActionType: SwiftProtobuf._ProtoNameProviding {
   ]
 }
 
-extension FilemirrorSyncStatus: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".SyncStatus"
+extension FileMirrorSyncBatch: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SyncBatch"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "id"),
-    2: .same(proto: "status"),
-    3: .same(proto: "message"),
-    4: .standard(proto: "progress_percentage"),
+    1: .standard(proto: "session_id"),
+    2: .same(proto: "actions"),
   ]
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -211,45 +166,27 @@ extension FilemirrorSyncStatus: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
-      case 2: try { try decoder.decodeSingularEnumField(value: &self.status) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.message) }()
-      case 4: try { try decoder.decodeSingularInt32Field(value: &self.progressPercentage) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.sessionID) }()
+      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.actions) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.id.isEmpty {
-      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    if !self.sessionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.sessionID, fieldNumber: 1)
     }
-    if self.status != .inProgress {
-      try visitor.visitSingularEnumField(value: self.status, fieldNumber: 2)
-    }
-    if !self.message.isEmpty {
-      try visitor.visitSingularStringField(value: self.message, fieldNumber: 3)
-    }
-    if self.progressPercentage != 0 {
-      try visitor.visitSingularInt32Field(value: self.progressPercentage, fieldNumber: 4)
+    if !self.actions.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.actions, fieldNumber: 2)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: FilemirrorSyncStatus, rhs: FilemirrorSyncStatus) -> Bool {
-    if lhs.id != rhs.id {return false}
-    if lhs.status != rhs.status {return false}
-    if lhs.message != rhs.message {return false}
-    if lhs.progressPercentage != rhs.progressPercentage {return false}
+  public static func ==(lhs: FileMirrorSyncBatch, rhs: FileMirrorSyncBatch) -> Bool {
+    if lhs.sessionID != rhs.sessionID {return false}
+    if lhs.actions != rhs.actions {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
-}
-
-extension FilemirrorSyncStatus.StatusType: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    0: .same(proto: "IN_PROGRESS"),
-    1: .same(proto: "COMPLETED"),
-    2: .same(proto: "FAILED"),
-  ]
 }

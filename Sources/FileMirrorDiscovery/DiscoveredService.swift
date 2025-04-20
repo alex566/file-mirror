@@ -212,7 +212,7 @@ public final class DiscoveredService: Sendable {
     private func receiveData(connection: NWConnection, destinationURL: URL, continuation: AsyncThrowingStream<ConnectionState, Error>.Continuation) {
         print("Start receiving data")
         // Set up to receive the message
-        connection.receiveMessage { [weak self] (data, context, isComplete, error) in
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] (data, context, isComplete, error) in
             print("Received message")
             
             guard let self = self else {

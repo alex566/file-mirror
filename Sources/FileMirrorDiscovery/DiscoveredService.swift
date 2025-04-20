@@ -208,6 +208,7 @@ public final class DiscoveredService: Sendable {
     
     /// Receive and process data from the connection
     private func receiveData(connection: NWConnection, destinationURL: URL, continuation: AsyncThrowingStream<ConnectionState, Error>.Continuation) {
+        print("Start receiving data")
         // Set up to receive the message
         connection.receiveMessage { [weak self] (data, context, isComplete, error) in
             print("Received message")

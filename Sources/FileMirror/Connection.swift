@@ -48,7 +48,38 @@ public final class Connection: Sendable {
         self.nwConnection = nwConnection
         setupConnection()
     }
+
+    /// Start the connection
+    public func start() {
+        nwConnection.start(queue: queue)
+    }
+
+    public func mirrorFiles(urls: [URL]) async {
+        await withTaskGroup { group in
+            for url in urls {
+                group.addTask {
+                    let fileSession = FileSession(id: UUID().uuidString, url: url)
+                    await fileSession.start()
+                }
+            }
+        }
+    }
     
+    /// Get the current state of the connection
+    public func getState() async -> State {
+        await stateContainer.getState()
+    }
+    
+    /// Cancel the connection
+    public func cancel() {
+        nwConnection.cancel()
+    }
+    
+    /// Get the remote endpoint's description
+    public var endpointDescription: String {
+        nwConnection.endpoint.debugDescription
+    }
+
     /// Set up connection monitoring
     private func setupConnection() {
         nwConnection.stateUpdateHandler = { [weak self] newState in
@@ -74,29 +105,4 @@ public final class Connection: Sendable {
             }
         }
     }
-    
-    /// Get the current state of the connection
-    public func getState() async -> State {
-        return await stateContainer.getState()
-    }
-    
-    /// Start the connection
-    public func start() {
-        nwConnection.start(queue: queue)
-    }
-    
-    /// Cancel the connection
-    public func cancel() {
-        nwConnection.cancel()
-    }
-    
-    /// Get the remote endpoint's description
-    public var endpointDescription: String {
-        nwConnection.endpoint.debugDescription
-    }
-    
-    // Future implementation:
-    // - Send and receive data
-    // - Start and stop mirroring specific files
-    // - Monitor connection state changes
 } 

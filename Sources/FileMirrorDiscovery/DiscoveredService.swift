@@ -321,6 +321,9 @@ public final class DiscoveredService: Sendable {
             try handle.write(contentsOf: action.content)
             try handle.synchronize()
             handle.closeFile()
+
+            try (fileURL as NSURL).setResourceValue(Date(), forKey: URLResourceKey.contentModificationDateKey)
+
             continuation.yield(.updated(fileURL: fileURL))
             
         case .delete:

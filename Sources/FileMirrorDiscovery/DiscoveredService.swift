@@ -318,13 +318,21 @@ public final class DiscoveredService: Sendable {
         let fileURL = destinationURL.appendingPathComponent(relativePath)
         
         switch action.actionType {
-        case .create, .update:
+        case .create:
             // Create directory if needed
             let directoryURL = fileURL.deletingLastPathComponent()
             try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true, attributes: nil)
             
             // Write the file content
             try action.content.write(to: fileURL, options: .atomic)
+
+        case .update:
+
+            let handle = try FileHandle(forUpdating: fileURL)
+            try handle.truncate(atOffset: 0)
+            try handle.write(contentsOf: action.content)
+            try handle.synchronize()
+            handle.closeFile()
             
         case .delete:
             if fileManager.fileExists(atPath: fileURL.path) {

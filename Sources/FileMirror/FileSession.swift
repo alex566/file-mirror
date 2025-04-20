@@ -19,6 +19,8 @@ final class FileSession: Sendable {
             Task {
                 // Calculate the relative path using a more robust method
                 let relativePath = url.relativePath(from: folder)
+
+                print("Relative path: \(relativePath)")
                 
                 // Create initial file action for the file
                 do {

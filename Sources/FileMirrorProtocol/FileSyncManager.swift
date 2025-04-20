@@ -18,18 +18,38 @@ public enum FileSyncManager {
     ///   - content: Content of the file
     /// - Returns: A FileAction message
     public static func createFileActionMessage(
-        id: String = UUID().uuidString,
-        action: FileMirrorFileAction.ActionType,
+        id: String,
         filePath: String,
-        content: Data? = nil
+        content: Data
     ) -> FileMirrorFileAction {
         var message = FileMirrorFileAction()
         message.id = id
-        message.actionType = action
+        message.actionType = .create
         message.filePath = filePath
-        if let content = content {
-            message.content = content
-        }
+        message.content = content
+        return message
+    }
+
+    public static func updateFileActionMessage(
+        id: String,
+        filePath: String,
+        content: Data
+    ) -> FileMirrorFileAction {
+        var message = FileMirrorFileAction()
+        message.id = id
+        message.actionType = .update
+        message.filePath = filePath
+        message.content = content
+        return message
+    }
+
+    public static func batchMessage(
+        sessionId: String,
+        actions: [FileMirrorFileAction]
+    ) -> FileMirrorSyncBatch {
+        var message = FileMirrorSyncBatch()
+        message.sessionID = sessionId
+        message.actions = actions
         return message
     }
     

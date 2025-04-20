@@ -20,6 +20,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-protobuf.git", from: "1.25.0"),
+        .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -35,7 +36,10 @@ let package = Package(
             ]),
         .target(
             name: "FileMirror",
-            dependencies: ["FileMirrorProtocol"]),
+            dependencies: [
+                "FileMirrorProtocol",
+                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms")
+            ]),
         .target(
             name: "FileMirrorDiscovery",
             dependencies: ["FileMirrorProtocol"]),

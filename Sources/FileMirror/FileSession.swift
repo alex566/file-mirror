@@ -1,5 +1,7 @@
 import Foundation
+import FileMirrorProtocol
 
+/// A session that monitors a file and emits changes as an async stream of actions
 final class FileSession: Sendable {
     let id: String
     let url: URL
@@ -9,18 +11,53 @@ final class FileSession: Sendable {
         self.url = url
     }
     
-    func start() async {
-        // Send initial file data
-
-        let watcher = FileWatcher()
-        let stream = watcher.observe(url: url, event: .write)
-
-        do {
-            for try await _ in stream {
-                // Calculate diff and send it to the connection
+    /// Start monitoring the file and return a stream of file actions
+    func start() -> AsyncStream<FileMirrorFileAction> {
+        AsyncStream { continuation in
+            Task {
+                let path = url.path(percentEncoded: false)
+                
+                // Create initial file action for the file
+                do {
+                    let fileData = try Data(contentsOf: url)
+                    let action = FileSyncManager.createFileActionMessage(
+                        id: id, 
+                        filePath: path, 
+                        content: fileData
+                    )
+                    continuation.yield(action)
+                } catch {
+                    print("Error reading file content: \(error)")
+                }
+                
+                // Watch for changes
+                let watcher = FileWatcher()
+                let stream = watcher.observe(url: url, event: .write)
+                
+                do {
+                    for try await _ in stream {
+                        do {
+                            let updatedData = try Data(contentsOf: url)
+                            let action = FileSyncManager.updateFileActionMessage(
+                                id: id, 
+                                filePath: path, 
+                                content: updatedData
+                            )
+                            continuation.yield(action)
+                        } catch {
+                            print("Error reading updated file content: \(error)")
+                        }
+                    }
+                } catch {
+                    print("Error watching file: \(error)")
+                    continuation.finish()
+                }
             }
-        } catch {
-            print("Error watching file: \(error)")
+            
+            continuation.onTermination = { _ in
+                // Clean up resources when the stream is terminated
+                print("FileSession for \(self.url.lastPathComponent) terminated")
+            }
         }
     }
 }

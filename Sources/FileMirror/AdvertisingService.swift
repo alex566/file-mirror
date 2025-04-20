@@ -5,6 +5,7 @@
 //  Created by Oleksii Oliinyk on 18.04.25.
 //
 
+import Foundation
 import Network
 
 /// Error types for the AdvertisingService
@@ -85,8 +86,8 @@ public actor AdvertisingService {
             }
 
             listener?.newConnectionHandler = { nwConnection in
-                // Create a Connection object from the NWConnection
-                let connection = Connection(nwConnection: nwConnection)
+                let id = UUID().uuidString
+                let connection = Connection(id: id, nwConnection: nwConnection)
                 
                 // Start the connection
                 connection.start()

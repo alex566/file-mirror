@@ -7,9 +7,13 @@
 
 import Network
 import Foundation
+import AsyncAlgorithms
+import FileMirrorProtocol
 
 /// Represents a connection to a peer for file mirroring
 public final class Connection: Sendable {
+    
+    let id: String
     
     /// The underlying Network framework connection
     private let nwConnection: NWConnection
@@ -44,7 +48,8 @@ public final class Connection: Sendable {
     private let queue = DispatchQueue(label: "com.filemirror.connection")
     
     /// Initialize with an NWConnection
-    internal init(nwConnection: NWConnection) {
+    internal init(id: String, nwConnection: NWConnection) {
+        self.id = id
         self.nwConnection = nwConnection
         setupConnection()
     }
@@ -54,14 +59,56 @@ public final class Connection: Sendable {
         nwConnection.start(queue: queue)
     }
 
+    /// Mirror multiple files, collecting changes into batches
     public func mirrorFiles(urls: [URL]) async {
+        let actionChannel = AsyncChannel<FileMirrorFileAction>()
         await withTaskGroup { group in
+            // Start a file session for each URL
             for url in urls {
+                let id = UUID().uuidString
+                let session = FileSession(id: id, url: url)
+                
+                // Add a task to monitor file changes
                 group.addTask {
-                    let fileSession = FileSession(id: UUID().uuidString, url: url)
-                    await fileSession.start()
+                    for await action in session.start() {
+                        await actionChannel.send(action)
+                    }
                 }
             }
+            
+            // Add a task to process debounced actions
+            group.addTask {
+                for await action in actionChannel.debounce(for: .seconds(0.1)) {
+                    let batch = FileSyncManager.batchMessage(
+                        sessionId: self.id,
+                        actions: [action]
+                    )
+                    
+                    do {
+                        let data = try batch.serializedData()
+                        await self.sendData(data)
+                    } catch {
+                        print("Error encoding batch: \(error)")
+                    }
+                }
+            }
+        }
+    }
+    
+    /// Send data over the connection
+    private func sendData(_ data: Data) async {
+        await withCheckedContinuation { continuation in
+            nwConnection.send(
+                content: data,
+                contentContext: .defaultMessage,
+                isComplete: true,
+                completion: .contentProcessed { error in
+                    if let error = error {
+                        print("Error sending data: \(error)")
+                    }
+                    continuation.resume()
+                }
+            )
         }
     }
     

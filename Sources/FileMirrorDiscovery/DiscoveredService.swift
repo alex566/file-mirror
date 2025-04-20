@@ -289,7 +289,6 @@ public final class DiscoveredService: Sendable {
             
             // Process each action and emit appropriate events
             for action in batch.actions {
-                print("Process action: \(action.actionType)")
                 try await applyFileAction(action, destinationURL: destinationURL, continuation: continuation)
             }
         } catch {

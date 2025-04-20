@@ -7,6 +7,7 @@
 
 import Foundation
 import Network
+import FileMirrorProtocol
 
 /// Connection state for a discovered service
 public enum ConnectionState: Sendable, Equatable {
@@ -88,7 +89,7 @@ public final class DiscoveredService: Sendable {
     /// Connect to the discovered service
     /// - Returns: An AsyncThrowingStream that emits connection state updates
     /// - Throws: Error if connection fails to start
-    public func connect() -> AsyncThrowingStream<ConnectionState, Error> {
+    public func connect(destinationURL: URL) -> AsyncThrowingStream<ConnectionState, Error> {
         return AsyncThrowingStream { continuation in
             Task { [weak self] in
                 guard let self = self else {
@@ -171,13 +172,126 @@ public final class DiscoveredService: Sendable {
         
         await stateContainer.setState(.disconnected)
     }
-
-    public func startMirroring(to destinationURL: URL) async throws {
-        
+    
+    /// Start receiving mirrored files
+    /// - Parameter destinationURL: The base URL where mirrored files will be saved
+    /// - Returns: An async stream of mirroring events
+    public func startMirroring(destinationURL: URL) async throws -> AsyncThrowingStream<ConnectionState, Error> {
+        AsyncThrowingStream { continuation in
+            Task { [weak self] in
+                guard let self = self else {
+                    continuation.finish(throwing: NSError(domain: "DiscoveredService", 
+                                                        code: -1, 
+                                                        userInfo: [NSLocalizedDescriptionKey: "Service was deallocated"]))
+                    return
+                }
+                
+                let connection = await self.stateContainer.getConnection()
+                guard let connection = connection else {
+                    continuation.finish(throwing: NSError(domain: "DiscoveredService", 
+                                                        code: -2, 
+                                                        userInfo: [NSLocalizedDescriptionKey: "Not connected"]))
+                    return
+                }
+                
+                await self.stateContainer.setState(.mirroring(destinationURL))
+                continuation.yield(.mirroring(destinationURL))
+                
+                // Start receiving data
+                self.receiveData(connection: connection, destinationURL: destinationURL, continuation: continuation)
+            }
+        }
     }
     
-    /// Stop mirroring files
-    public func stopMirroring() async {
+    /// Receive and process data from the connection
+    private func receiveData(connection: NWConnection, destinationURL: URL, continuation: AsyncThrowingStream<ConnectionState, Error>.Continuation) {
+        // Set up to receive the message
+        connection.receiveMessage { [weak self] (data, context, isComplete, error) in
+            guard let self = self else {
+                continuation.finish()
+                return
+            }
+            
+            if let error = error {
+                let failedState = ConnectionState.failed(error.localizedDescription)
+                Task {
+                    await self.stateContainer.setState(failedState)
+                    continuation.yield(failedState)
+                    continuation.finish(throwing: error)
+                }
+                return
+            }
+            
+            if let data = data, !data.isEmpty {
+                // Process the received data
+                Task {
+                    do {
+                        try await self.processSyncData(data: data, destinationURL: destinationURL)
+                        
+                        // Continue receiving more data
+                        self.receiveData(connection: connection, destinationURL: destinationURL, continuation: continuation)
+                    } catch {
+                        let failedState = ConnectionState.failed(error.localizedDescription)
+                        await self.stateContainer.setState(failedState)
+                        continuation.yield(failedState)
+                        continuation.finish(throwing: error)
+                    }
+                }
+            } else if isComplete {
+                // Connection was closed by the remote peer
+                Task {
+                    await self.stateContainer.setState(.disconnected)
+                    continuation.yield(.disconnected)
+                    continuation.finish()
+                }
+            } else {
+                // Continue receiving
+                self.receiveData(connection: connection, destinationURL: destinationURL, continuation: continuation)
+            }
+        }
+    }
+    
+    /// Process data received from the connection
+    private func processSyncData(data: Data, destinationURL: URL) async throws {
+        do {
+            // Parse the batch message
+            let batch = try FileMirrorSyncBatch(serializedBytes: data)
+            
+            // Process each action
+            for action in batch.actions {
+                try await applyFileAction(action, destinationURL: destinationURL)
+            }
+        } catch {
+            print("Error processing sync data: \(error)")
+            throw error
+        }
+    }
+    
+    /// Apply a file action to the local file system
+    private func applyFileAction(_ action: FileMirrorFileAction, destinationURL: URL) async throws {
+        let fileManager = FileManager.default
         
+        // Construct the full file path relative to the destination URL
+        let relativePath = action.filePath.starts(with: "/") ? String(action.filePath.dropFirst()) : action.filePath
+        let fileURL = destinationURL.appendingPathComponent(relativePath)
+        
+        switch action.actionType {
+        case .create, .update:
+            // Create directory if needed
+            let directoryURL = fileURL.deletingLastPathComponent()
+            try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true, attributes: nil)
+            
+            // Write the file content
+            try action.content.write(to: fileURL)
+            
+        case .delete:
+            if fileManager.fileExists(atPath: fileURL.path) {
+                try fileManager.removeItem(at: fileURL)
+            }
+        case .UNRECOGNIZED(let value):
+            throw NSError(domain: "DiscoveredService", 
+                        code: -3, 
+                        userInfo: [NSLocalizedDescriptionKey: "Unrecognized action type: \(value)"])
+        }
     }
 } 

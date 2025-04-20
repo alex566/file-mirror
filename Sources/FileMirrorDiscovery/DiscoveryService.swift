@@ -46,7 +46,10 @@ public actor DiscoveryService {
             parameters.includePeerToPeer = true
 
             // Describe the DNS-SD service
-            let descriptor = NWBrowser.Descriptor.bonjourWithTXTRecord(type: serviceType, domain: nil)
+            let descriptor = NWBrowser.Descriptor.bonjourWithTXTRecord(
+                type: serviceType,
+                domain: nil
+            )
             self.browser = NWBrowser(for: descriptor, using: parameters)
             
             // Set up the state update handler
@@ -134,5 +137,5 @@ private func processResults(_ results: Set<NWBrowser.Result>) -> [DiscoveredServ
         }
     }
     
-    return services.sorted { $0.name < $1.name }
+    return services
 }

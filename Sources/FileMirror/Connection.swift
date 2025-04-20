@@ -79,8 +79,7 @@ public final class Connection: Sendable {
             // Add a task to process debounced actions
             group.addTask {
                 for await actions in actionChannel.chunked(by: .repeating(every: .milliseconds(100))) {
-                    
-                    print("Send actions: \(actions)")
+                    print("Sending batch of \(actions.count) actions")
                     
                     let batch = FileSyncManager.batchMessage(
                         sessionId: self.id,

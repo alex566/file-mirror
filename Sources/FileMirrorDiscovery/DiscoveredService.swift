@@ -300,7 +300,7 @@ public final class DiscoveredService: Sendable {
             
             // Process each action
             for action in batch.actions {
-                print("Process action: \(action)")
+                print("Process action: \(action.actionType)")
                 try await applyFileAction(action, destinationURL: destinationURL)
             }
         } catch {

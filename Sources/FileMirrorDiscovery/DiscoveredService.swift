@@ -210,11 +210,15 @@ public final class DiscoveredService: Sendable {
     
     /// Receive and process data from the connection
     private func receiveData(connection: NWConnection, destinationURL: URL, continuation: AsyncThrowingStream<ConnectionState, Error>.Continuation) {
-        print("Start receiving data")
-        // Set up to receive the message
+        // Create a data buffer to accumulate incoming data chunks
+        self.receiveDataBuffer(connection: connection, buffer: Data(), destinationURL: destinationURL, continuation: continuation)
+    }
+    
+    /// Receive and buffer data from the connection until a complete message is received
+    private func receiveDataBuffer(connection: NWConnection, buffer: Data, destinationURL: URL, continuation: AsyncThrowingStream<ConnectionState, Error>.Continuation) {
+        print("Receiving data chunks")
+        
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] (data, context, isComplete, error) in
-            print("Received message")
-            
             guard let self = self else {
                 continuation.finish()
                 return
@@ -230,14 +234,26 @@ public final class DiscoveredService: Sendable {
                 return
             }
             
+            // If we received data, add it to our buffer
             if let data = data, !data.isEmpty {
-                // Process the received data
+                var updatedBuffer = buffer
+                updatedBuffer.append(data)
+                print("Received data chunk: \(data.count) bytes, buffer now: \(updatedBuffer.count) bytes")
+                
+                // Try to process the buffer as a complete message
                 Task {
                     do {
-                        try await self.processSyncData(data: data, destinationURL: destinationURL)
-                        
-                        // Continue receiving more data
-                        self.receiveData(connection: connection, destinationURL: destinationURL, continuation: continuation)
+                        if self.isCompleteMessage(updatedBuffer) {
+                            print("Complete message received")
+                            try await self.processSyncData(data: updatedBuffer, destinationURL: destinationURL)
+                            
+                            // Start receiving the next message with a fresh buffer
+                            self.receiveDataBuffer(connection: connection, buffer: Data(), destinationURL: destinationURL, continuation: continuation)
+                        } else {
+                            // Message is incomplete, continue receiving more data
+                            print("Message incomplete, continuing to receive")
+                            self.receiveDataBuffer(connection: connection, buffer: updatedBuffer, destinationURL: destinationURL, continuation: continuation)
+                        }
                     } catch {
                         let failedState = ConnectionState.failed(error.localizedDescription)
                         await self.stateContainer.setState(failedState)
@@ -253,9 +269,26 @@ public final class DiscoveredService: Sendable {
                     continuation.finish()
                 }
             } else {
-                // Continue receiving
-                self.receiveData(connection: connection, destinationURL: destinationURL, continuation: continuation)
+                // No data received but not complete, continue receiving
+                self.receiveDataBuffer(connection: connection, buffer: buffer, destinationURL: destinationURL, continuation: continuation)
             }
+        }
+    }
+    
+    /// Check if the data buffer contains a complete message
+    private func isCompleteMessage(_ data: Data) -> Bool {
+        // Implement message framing check based on your protocol
+        // For example, check if the message has a proper header/footer,
+        // or if it contains the expected length
+        
+        do {
+            // Try to deserialize the data to see if it's a complete batch
+            // This is a simple approach - if it deserializes successfully, it's complete
+            _ = try FileMirrorSyncBatch(serializedBytes: data)
+            return true
+        } catch {
+            // If deserialization fails, the message is likely incomplete
+            return false
         }
     }
     

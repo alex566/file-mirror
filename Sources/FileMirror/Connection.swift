@@ -10,9 +10,14 @@ import Foundation
 import AsyncAlgorithms
 import FileMirrorProtocol
 
-public struct MirrorFile {
+public struct MirrorFile: Sendable {
     let url: URL
     let isShared: Bool
+
+    init(url: URL, isShared: Bool) {
+        self.url = url
+        self.isShared = isShared
+    }
 }
 
 /// Represents a connection to a peer for file mirroring

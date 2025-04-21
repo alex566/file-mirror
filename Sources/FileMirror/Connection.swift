@@ -14,7 +14,7 @@ public struct MirrorFile: Sendable {
     let url: URL
     let isShared: Bool
 
-    init(url: URL, isShared: Bool) {
+    public init(url: URL, isShared: Bool) {
         self.url = url
         self.isShared = isShared
     }

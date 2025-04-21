@@ -1,3 +1,6 @@
+# Warning!
+WIP
+
 # FileMirror
 
 FileMirror is a Swift library for mirroring files between devices over a local network. It uses Bonjour for service discovery and real-time file synchronization with rsync-like delta updates.

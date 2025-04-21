@@ -150,17 +150,7 @@ public final class MemoryMappedFile: @unchecked Sendable {
             _ = memcpy(offsetPointer, bytes.baseAddress, data.count)
         }
     }
-    
-    /// Force synchronization of the memory-mapped content to disk
-    public func sync() {
-        msync(pointer, fileSize, MS_SYNC)
-    }
-    
-    /// Force asynchronous synchronization of the memory-mapped content to disk
-    public func asyncSync() {
-        msync(pointer, fileSize, MS_ASYNC)
-    }
-    
+
     deinit {
         // Cancel any ongoing polling
         pollingTask?.cancel()

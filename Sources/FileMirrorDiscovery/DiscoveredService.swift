@@ -319,7 +319,6 @@ public final class DiscoveredService: Sendable {
 
                 let sharedFileURL = try MemoryMappedFile(path: fileURL.path(percentEncoded: false), readOnly: false)
                 try sharedFileURL.write(data: sharedData, offset: 0)
-                sharedFileURL.sync()
             }
 
             continuation.yield(.created(fileURL: fileURL))
@@ -335,7 +334,6 @@ public final class DiscoveredService: Sendable {
 
                 let sharedFileURL = try MemoryMappedFile(path: fileURL.path(percentEncoded: false), readOnly: false)
                 try sharedFileURL.write(data: sharedData, offset: 0)
-                sharedFileURL.sync()
             }
 
             continuation.yield(.updated(fileURL: fileURL))

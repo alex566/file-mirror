@@ -1,5 +1,6 @@
 import Foundation
 import FileMirrorProtocol
+import AsyncAlgorithms
 
 /// A session that monitors a file and emits changes as an async stream of actions
 final class FileSession: Sendable {
@@ -19,10 +20,7 @@ final class FileSession: Sendable {
     func start() -> AsyncStream<FileMirrorFileAction> {
         AsyncStream { continuation in
             Task {
-                // Calculate the relative path using a more robust method
                 let relativePath = url.relativePath(from: folder)
-
-                print("Relative path: \(relativePath)")
                 
                 // Create initial file action for the file
                 do {
@@ -39,27 +37,51 @@ final class FileSession: Sendable {
                 
                 // Watch for changes
                 let watcher = FileWatcher()
-                let stream = watcher.observe(url: url, event: .write)
+                let fileWatcherStream = watcher.observe(url: url, event: .write)
 
                 let sharedMmap: MemoryMappedFile? = if isShared {
                     try MemoryMappedFile(path: url.path, readOnly: false)
                 } else {
                     nil
                 }
-                
+
                 do {
-                    for try await _ in stream {
-                        do {
-                            let updatedData = try Data(contentsOf: url)
-                            let action = FileSyncManager.updateFileActionMessage(
-                                id: id, 
-                                filePath: relativePath, 
-                                content: updatedData,
-                                shared: sharedMmap?.readAll()
-                            )
-                            continuation.yield(action)
-                        } catch {
-                            print("Error reading updated file content: \(error)")
+                    if let pollingStream = sharedMmap?.watchForChanges() {
+                        // If we have both streams, merge them using AsyncAlgorithms
+                        let mergedStream = merge(
+                            fileWatcherStream.map { _ in () },
+                            pollingStream
+                        )
+                        
+                        for try await _ in mergedStream {
+                            do {
+                                let updatedData = try Data(contentsOf: url)
+                                let action = FileSyncManager.updateFileActionMessage(
+                                    id: id, 
+                                    filePath: relativePath, 
+                                    content: updatedData,
+                                    shared: sharedMmap?.readAll()
+                                )
+                                continuation.yield(action)
+                            } catch {
+                                print("Error reading updated file content: \(error)")
+                            }
+                        }
+                    } else {
+                        // If we only have the file watcher stream, use it directly
+                        for try await _ in fileWatcherStream {
+                            do {
+                                let updatedData = try Data(contentsOf: url)
+                                let action = FileSyncManager.updateFileActionMessage(
+                                    id: id, 
+                                    filePath: relativePath, 
+                                    content: updatedData,
+                                    shared: nil
+                                )
+                                continuation.yield(action)
+                            } catch {
+                                print("Error reading updated file content: \(error)")
+                            }
                         }
                     }
                 } catch {

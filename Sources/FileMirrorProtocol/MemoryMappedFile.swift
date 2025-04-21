@@ -1,11 +1,14 @@
 import Foundation
+import Dispatch
 
 /// A class that provides memory-mapped file access
-public class MemoryMappedFile {
+public final class MemoryMappedFile: @unchecked Sendable {
     private let fileDescriptor: Int32
     private let fileSize: Int
     private let pointer: UnsafeMutableRawPointer
     private let isReadOnly: Bool
+    private var pollingTask: Task<Void, Never>?
+    private let lock = NSLock()
     
     /// Opens a file as memory-mapped
     /// - Parameters:
@@ -38,6 +41,73 @@ public class MemoryMappedFile {
         
         pointer = mappedPointer
         isReadOnly = readOnly
+    }
+    
+    /// Calculate a simple checksum of the memory content to detect changes
+    private func calculateChecksum() -> Int {
+        var checksum = 0
+        
+        // Read memory in chunks to improve performance
+        let chunkSize = min(4096, fileSize)
+        
+        for offset in stride(from: 0, to: fileSize, by: chunkSize) {
+            let size = min(chunkSize, fileSize - offset)
+            let ptr = pointer.advanced(by: offset).assumingMemoryBound(to: UInt8.self)
+            
+            for i in 0..<size {
+                checksum = ((checksum << 5) &+ checksum) &+ Int(ptr[i])
+            }
+        }
+        
+        return checksum
+    }
+    
+    /// Watch for changes in the memory-mapped file using polling
+    /// - Parameters:
+    ///   - interval: The polling interval in seconds
+    /// - Returns: An AsyncStream that emits when changes are detected
+    public func watchForChanges(interval: TimeInterval = 0.05) -> AsyncStream<Void> {
+        lock.lock()
+        defer { lock.unlock() }
+        
+        // Cancel any existing polling task
+        pollingTask?.cancel()
+        
+        // Create an AsyncStream to notify about changes
+        return AsyncStream { continuation in
+            var lastChecksum = self.calculateChecksum()
+            
+            // Start a new polling task
+            self.pollingTask = Task { [self] in
+                while !Task.isCancelled {
+                    do {
+                        // Wait for the specified interval
+                        try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                        
+                        // Check if the content has changed
+                        let currentChecksum = self.calculateChecksum()
+                        if currentChecksum != lastChecksum {
+                            lastChecksum = currentChecksum
+                            continuation.yield()
+                        }
+                    } catch {
+                        // Task was likely cancelled
+                        break
+                    }
+                }
+                
+                continuation.finish()
+            }
+            
+            // Set up cancellation handler
+            continuation.onTermination = { [weak self] _ in
+                guard let self = self else { return }
+                self.lock.lock()
+                defer { self.lock.unlock() }
+                self.pollingTask?.cancel()
+                self.pollingTask = nil
+            }
+        }
     }
     
     /// Read the entire mapped file content
@@ -92,6 +162,9 @@ public class MemoryMappedFile {
     }
     
     deinit {
+        // Cancel any ongoing polling
+        pollingTask?.cancel()
+        
         // Unmap the memory
         munmap(pointer, fileSize)
         
